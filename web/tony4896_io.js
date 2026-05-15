@@ -468,9 +468,25 @@ app.registerExtension({
             const orig = nodeType.prototype.onNodeCreated;
             nodeType.prototype.onNodeCreated = function () {
                 orig?.apply(this, arguments);
-                this.title = "II. Load Image Batches (Tony4896)";
+                this.title = "• Load Image Batches (Tony)";
                 const info = addTextLabel(this, "width x height", "");
                 const preview = addPreviewWidget(this);
+
+                const syncBatchSelection = async (source = "") => {
+                    const folder = getWidget(this, "folder_path", "");
+                    if (!folder) return;
+                    const data = await refreshFolderList(this, folder, "index");
+                    if (!data?.files?.length) return;
+                    if (source === "file_name") {
+                        const currentName = String(getWidget(this, "file_name", "") || "");
+                        const idx = data.files.findIndex(f => f.name === currentName);
+                        if (idx >= 0) setWidgetSilent(this, "index", idx);
+                    } else {
+                        const idx = Math.max(0, Math.min(getNumberWidget(this, "index", 0), data.files.length - 1));
+                        setWidgetSilent(this, "index", idx);
+                        setWidgetSilent(this, "file_name", data.files[idx].name);
+                    }
+                };
                 this.addWidget("button", "Open Folder", null, async () => {
                     try {
                         const data = await uploadFolderImages();
@@ -503,7 +519,9 @@ app.registerExtension({
                         w.callback = async (v) => {
                             old?.call(w, v);
                             try {
-                                if (name === "folder_path" && v) await refreshFolderList(this, v, "index");
+                                if (name === "folder_path" && v) await syncBatchSelection("index");
+                                if (name === "index") await syncBatchSelection("index");
+                                if (name === "file_name") await syncBatchSelection("file_name");
                                 await refreshImage(this, preview, info, true);
                             } catch (_) {}
                         };
