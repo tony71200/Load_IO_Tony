@@ -14,26 +14,25 @@ from .nodes.common import (
     _temp_size_bytes,
     _without_ext_and_parent,
 )
-from .nodes.image_nodes import Tony4896LoadImage, Tony4896LoadImageBatches
-from .nodes.text_nodes import Tony4896SaveTxt, Tony4896TextSplitterBatches, _save_txt, _split_text_file
-from .nodes.utility_nodes import Tony4896DelayTime
+from .nodes.load_image_node import LoadImage
+from .nodes.load_image_batches_node import LoadImageBatches
+from .nodes.save_txt_node import SaveTxt, _save_txt
+from .nodes.text_splitter_node import TextSplitter, _split_text_file
 
 WEB_DIRECTORY = "./web"
 
 NODE_CLASS_MAPPINGS = {
-    "Tony4896LoadImage": Tony4896LoadImage,
-    "Tony4896LoadImageBatches": Tony4896LoadImageBatches,
-    "Tony4896TextSplitterBatches": Tony4896TextSplitterBatches,
-    "Tony4896SaveTxt": Tony4896SaveTxt,
-    "Tony4896DelayTime": Tony4896DelayTime,
+    "Load_Image": LoadImage,
+    "Load_Image_Batches": LoadImageBatches,
+    "Text_Splitter": TextSplitter,
+    "Save_Txt": SaveTxt,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "Tony4896LoadImage": "I. Load Image (Tony4896)",
-    "Tony4896LoadImageBatches": "II. Load Image Batches (Tony4896)",
-    "Tony4896TextSplitterBatches": "III. Text Splitter Batches (Tony4896)",
-    "Tony4896SaveTxt": "IV. Save TXT (Tony4896)",
-    "Tony4896DelayTime": "V. Delay Time (Tony4896)",
+    "Load_Image": "Load_Image",
+    "Load_Image_Batches": "Load_Image_Batches",
+    "Text_Splitter": "Text_Splitter",
+    "Save_Txt": "Save_Txt",
 }
 
 try:
