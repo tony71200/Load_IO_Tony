@@ -422,11 +422,11 @@ app.registerExtension({
     name: "Tony4896.IO.v4",
     async beforeRegisterNodeDef(nodeType, nodeData, app) {
         const comfyClass = nodeData.name;
-        if (comfyClass === "Tony4896LoadImage") {
+        if (comfyClass === "Load_Image") {
             const orig = nodeType.prototype.onNodeCreated;
             nodeType.prototype.onNodeCreated = function () {
                 orig?.apply(this, arguments);
-                this.title = "I. Load Image (Tony4896)";
+                this.title = "Load_Image";
                 const info = addTextLabel(this, "width x height", "");
                 const preview = addPreviewWidget(this);
                 this.addWidget("button", "Open", null, async () => {
@@ -464,11 +464,11 @@ app.registerExtension({
                 }
             };
         }
-        if (comfyClass === "Tony4896LoadImageBatches") {
+        if (comfyClass === "Load_Image_Batches") {
             const orig = nodeType.prototype.onNodeCreated;
             nodeType.prototype.onNodeCreated = function () {
                 orig?.apply(this, arguments);
-                this.title = "• Load Image Batches (Tony)";
+                this.title = "Load_Image_Batches";
                 const info = addTextLabel(this, "width x height", "");
                 const preview = addPreviewWidget(this);
 
@@ -529,11 +529,11 @@ app.registerExtension({
                 }
             };
         }
-        if (comfyClass === "Tony4896TextSplitterBatches") {
+        if (comfyClass === "Text_Splitter") {
             const orig = nodeType.prototype.onNodeCreated;
             nodeType.prototype.onNodeCreated = function () {
                 orig?.apply(this, arguments);
-                this.title = "III. Text Splitter Batches (Tony4896)";
+                this.title = "Text_Splitter";
                 const info = addTextLabel(this, "Text Info", "");
                 const posPreview = addTextPreviewWidget(this, "Preview Positive Prompt");
                 const negPreview = addTextPreviewWidget(this, "Preview Negative Prompt");
@@ -568,11 +568,11 @@ app.registerExtension({
                 }
             };
         }
-        if (comfyClass === "Tony4896SaveTxt") {
+        if (comfyClass === "Save_Txt") {
             const orig = nodeType.prototype.onNodeCreated;
             nodeType.prototype.onNodeCreated = function () {
                 orig?.apply(this, arguments);
-                this.title = "IV. Save TXT (Tony4896)";
+                this.title = "Save_Txt";
                 const info = addTextLabel(this, "Character count", "0");
                 const preview = addTextPreviewWidget(this, "Preview text");
                 const syncPreview = () => {
@@ -599,14 +599,6 @@ app.registerExtension({
                     if (w) { const old = w.callback; w.callback = (v) => { old?.call(w, v); syncPreview(); }; }
                 }
                 syncPreview();
-            };
-        }
-        if (comfyClass === "Tony4896DelayTime") {
-            const orig = nodeType.prototype.onNodeCreated;
-            nodeType.prototype.onNodeCreated = function () {
-                orig?.apply(this, arguments);
-                this.title = "V. Delay Time (Tony4896)";
-                addTextLabel(this, "Note", "Do not connect this output back to an upstream index input.");
             };
         }
     },
