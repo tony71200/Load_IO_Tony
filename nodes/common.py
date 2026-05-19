@@ -172,9 +172,9 @@ def _resolve_image_path(mode: str, image_path: str, folder_path: str, file_name:
 
 
 def _load_image_tensor(path: str):
-    img = Image.open(path)
-    img = ImageOps.exif_transpose(img).convert("RGB")
-    width, height = img.size
-    arr = np.array(img).astype(np.float32) / 255.0
+    with Image.open(path) as img:
+        img = ImageOps.exif_transpose(img).convert("RGB")
+        width, height = img.size
+        arr = np.array(img).astype(np.float32) / 255.0
     tensor = torch.from_numpy(arr)[None,]
     return tensor, width, height

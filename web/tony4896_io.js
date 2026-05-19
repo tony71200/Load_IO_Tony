@@ -263,6 +263,16 @@ function getNumberWidget(node, name, fallback = 0) {
     return Number.isFinite(v) ? v : fallback;
 }
 
+function normalizeNumberWidget(node, name, fallback = 0) {
+    const w = widget(node, name);
+    if (!w) return;
+    const n = Number(w.value);
+    if (!Number.isFinite(n)) {
+        w.value = fallback;
+        w.callback?.(fallback);
+    }
+}
+
 function setAutoStatus(node, text) {
     const w = widget(node, "Auto Batch Status");
     if (w) w.value = text;
@@ -506,8 +516,10 @@ app.registerExtension({
                     const current = Number(getWidget(this, "index", 0) || 0);
                     setWidget(this, "index", current + 1);
                 });
-                this.addWidget("number", "auto_delay_seconds", 0.0, () => { }, { min: 0, max: 900, step: 0.5 });
-                this.addWidget("number", "auto_max_runs", 0, () => { }, { min: 0, max: 999999, step: 1 });
+                this.addWidget("number", "auto_delay_seconds", 0, () => { }, { min: 0, max: 900, step: 1, precision: 0 });
+                this.addWidget("number", "auto_max_runs", 0, () => { }, { min: 0, max: 999999, step: 1, precision: 0 });
+                normalizeNumberWidget(this, "auto_delay_seconds", 0);
+                normalizeNumberWidget(this, "auto_max_runs", 0);
                 addTextLabel(this, "Auto Batch Status", "Idle");
                 this.addWidget("button", "Start Auto Batch", null, async () => {
                     try {
@@ -553,8 +565,10 @@ app.registerExtension({
                     const current = Number(getWidget(this, "index", 0) || 0);
                     setWidget(this, "index", current + 1);
                 });
-                this.addWidget("number", "auto_delay_seconds", 1.0, () => { }, { min: 0, max: 900, step: 0.5 });
-                this.addWidget("number", "auto_max_runs", 0, () => { }, { min: 0, max: 999999, step: 1 });
+                this.addWidget("number", "auto_delay_seconds", 1, () => { }, { min: 0, max: 900, step: 1, precision: 0 });
+                this.addWidget("number", "auto_max_runs", 0, () => { }, { min: 0, max: 999999, step: 1, precision: 0 });
+                normalizeNumberWidget(this, "auto_delay_seconds", 1);
+                normalizeNumberWidget(this, "auto_max_runs", 0);
                 addTextLabel(this, "Auto Batch Status", "Idle");
                 this.addWidget("button", "Start Auto Batch", null, async () => {
                     try {
@@ -570,8 +584,8 @@ app.registerExtension({
                 //     const current = Number(getWidget(this, "index", 0) || 0);
                 //     setWidget(this, "index", current + 1);
                 // });
-                // this.addWidget("number", "auto_delay_seconds", 1.0, () => { }, { min: 0, max: 900, step: 0.5 });
-                // this.addWidget("number", "auto_max_runs", 0, () => { }, { min: 0, max: 999999, step: 1 });
+                // this.addWidget("number", "auto_delay_seconds", 1, () => { }, { min: 0, max: 900, step: 1, precision: 0 });
+                // this.addWidget("number", "auto_max_runs", 0, () => { }, { min: 0, max: 999999, step: 1, precision: 0 });
                 // addTextLabel(this, "Auto Batch Status", "Idle");
                 // this.addWidget("button", "Start Auto Batch", null, async () => {
                 //     try {
@@ -579,13 +593,16 @@ app.registerExtension({
                 //     } catch (e) { alert(e.message); }
                 // });
                 // this.addWidget("button", "Stop Auto Batch", null, () => stopAutoBatch("Stopped by user"));
-                // for (const name of ["txt_path", "paragraph_sep", "negative_sep", "index"]) {
-                //     const w = widget(this, name);
-                //     if (w) {
-                //         const old = w.callback;
-                //         w.callback = async (v) => { old?.call(w, v); try { await refreshTextSplitter(this, posPreview, negPreview, info); } catch (_) { } };
-                //     }
-                // }
+                for (const name of ["txt_path", "paragraph_sep", "negative_sep", "index"]) {
+                    const w = widget(this, name);
+                    if (w) {
+                        const old = w.callback;
+                        w.callback = async (v) => {
+                            old?.call(w, v);
+                            try { await refreshTextSplitter(this, posPreview, negPreview, info); } catch (_) { }
+                        };
+                    }
+                }
             };
         }
         if (comfyClass === "Save_Txt") {
