@@ -24,7 +24,7 @@ class PromptToPNGMeta:
     
     RETURN_TYPES = ("STRING", "STRING")
     RETURN_NAMES = ("positive", "negative")
-    FUNCTION = "inject_metadata"
+    FUNCTION = "inject"
     CATEGORY = "Tony4896/IO"
 
     def inject(self, positive, negative = "", lora_tags="", extra_pnginfo=None):
