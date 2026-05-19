@@ -621,5 +621,45 @@ app.registerExtension({
                 syncPreview();
             };
         }
+
+        if (comfyClass === "Prompt_To_PNG_Meta") {
+            const orig = nodeType.prototype.onNodeCreated;
+            nodeType.prototype.onNodeCreated = function () {
+                orig?.apply(this, arguments);
+                this.title = "Prompt_To_PNG_Meta";
+
+                // Label node description with supported variables for easy reference.
+                const hint = addTextLabel(this, "ℹ Info",
+                    "Injects prompt + LoRA into PNG metadata (CivitAI format)"
+                );
+
+                // Preview lora_tags + char count for easy debugging.
+                const loraCount = addTextLabel(this, "Lora Tag Length", "0 character(s)");
+
+                const syncLoraCount = () => {
+                    const v = String(getWidget(this, "lora_tags", "") || "");
+                    loraCount.value = `${v.length} character(s)${v ? " - " + v : ""}`;
+                    this.setDirtyCanvas(true, true);
+                };
+
+                // Hook to widget lora_tags to update count real-time.
+                const loraWidget = widget(this, "lora_tags");
+                if (loraWidget) {
+                    const old = loraWidget.callback;
+                    loraWidget.callback = (v) => {
+                        old?.call(loraWidget, v);
+                        syncLoraCount();
+                    };
+                }
+                syncLoraCount();
+
+                // quick-fill button format standard LoRA tags for easier testing
+                this.addWidget("button", "📋 Copy LoRA format hint", null, () => {
+                    const example = "<lora:ModelName:1>";
+                    navigator.clipboard?.writeText(example).catch(() => { });
+                    alert(`LoRA tag format:\n${example}\n\nVí dụ nhiều LoRA:\n<lora:Model_A:0.8>, <lora:Model_B:0.6>`);
+                });
+            };
+        }
     },
 });
