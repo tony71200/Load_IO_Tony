@@ -93,7 +93,7 @@ class SaveImageA1Metadata:
         return {
             "required": {
                 "images": ("IMAGE",),
-                "filename_prefix": ("STRING", {"default": "Tony4896/A1111"}),
+                "filename_prefix": ("STRING", {"default": "ZImage_%date:yyyy_MM_dd%/ZImage_%date:yyyy_MM_dd_HHmmss%_%Text_Splitter.index%_%KSampler.seed%"}),
             },
             "optional": {
                 "positive_prompt_override": ("STRING", {"multiline": True, "default": ""}),
