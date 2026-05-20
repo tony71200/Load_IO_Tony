@@ -1,5 +1,7 @@
 import hashlib
 import json
+import re
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -7,6 +9,11 @@ from PIL import Image
 from PIL.PngImagePlugin import PngInfo
 
 from .text_splitter_node import _split_text_file
+
+try:
+    from comfy.cli_args import args
+except Exception:  # pragma: no cover
+    args = None
 
 try:
     import folder_paths
@@ -115,6 +122,9 @@ class SaveImageA1Metadata:
 
     def __init__(self):
         self.output_dir = folder_paths.get_output_directory() if folder_paths else "."
+        self.type = "output"
+        self.prefix_append = ""
+        self.compress_level = 4
 
     @staticmethod
     def _strip_ext(name):
@@ -155,6 +165,29 @@ class SaveImageA1Metadata:
                         if name:
                             loras.append({"name": name, "strength": val.get("strength", 1)})
         return loras
+
+
+    @staticmethod
+    def _expand_date_tokens(text):
+        if not isinstance(text, str) or "%date:" not in text:
+            return text
+
+        def repl(match):
+            fmt = match.group(1)
+            now = datetime.now()
+            token_map = {
+                "yyyy": f"{now.year:04d}",
+                "MM": f"{now.month:02d}",
+                "dd": f"{now.day:02d}",
+                "HH": f"{now.hour:02d}",
+                "mm": f"{now.minute:02d}",
+                "ss": f"{now.second:02d}",
+            }
+            for token, value in sorted(token_map.items(), key=lambda kv: -len(kv[0])):
+                fmt = fmt.replace(token, value)
+            return fmt
+
+        return re.sub(r"%date:([^%]+)%", repl, text)
 
     def _lora_hash(self, lora_name):
         if not folder_paths:
@@ -218,6 +251,8 @@ class SaveImageA1Metadata:
         parts.append(", ".join([p for p in params if p and not p.endswith(": ")]))
         parameters_text = "\n".join(parts).strip()
 
+        filename_prefix = self._expand_date_tokens(filename_prefix + self.prefix_append)
+
         if folder_paths:
             full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
                 filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0]
@@ -227,20 +262,24 @@ class SaveImageA1Metadata:
             Path(full_output_folder).mkdir(parents=True, exist_ok=True)
 
         results = []
-        for image in images:
+        for batch_number, image in enumerate(images):
             i = 255.0 * image.cpu().numpy()
             img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
-            metadata = PngInfo()
-            metadata.add_text("parameters", parameters_text)
-            if prompt is not None:
-                metadata.add_text("prompt", json.dumps(prompt))
-            if extra_pnginfo is not None:
-                for key, value in extra_pnginfo.items():
-                    metadata.add_text(key, json.dumps(value))
+            metadata = None
+            disable_metadata = bool(args and getattr(args, "disable_metadata", False))
+            if not disable_metadata:
+                metadata = PngInfo()
+                metadata.add_text("parameters", parameters_text)
+                if prompt is not None:
+                    metadata.add_text("prompt", json.dumps(prompt))
+                if extra_pnginfo is not None:
+                    for key, value in extra_pnginfo.items():
+                        metadata.add_text(key, json.dumps(value))
 
-            file = f"{filename}_{counter:05}_.png"
+            filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
+            file = f"{filename_with_batch_num}_{counter:05}_.png"
             out_path = Path(full_output_folder) / file
-            img.save(out_path, pnginfo=metadata, compress_level=4)
+            img.save(out_path, pnginfo=metadata, compress_level=self.compress_level)
 
             if debug_sidecar:
                 Path(str(out_path) + ".parameters.txt").write_text(parameters_text, encoding="utf-8")
@@ -249,7 +288,7 @@ class SaveImageA1Metadata:
                     encoding="utf-8",
                 )
 
-            results.append({"filename": file, "subfolder": subfolder, "type": "output"})
+            results.append({"filename": file, "subfolder": subfolder, "type": self.type})
             counter += 1
 
         return {"ui": {"images": results}}
