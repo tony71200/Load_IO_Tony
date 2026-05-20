@@ -622,6 +622,58 @@ app.registerExtension({
             };
         }
 
+
+        if (comfyClass === "SaveImageA1Metadata") {
+            const orig = nodeType.prototype.onNodeCreated;
+            nodeType.prototype.onNodeCreated = function () {
+                orig?.apply(this, arguments);
+                this.title = "Save Image A1111 Metadata";
+
+                const info = addTextLabel(this, "ℹ Info", "Write PNG key: parameters + keep prompt/workflow");
+                const preview = addTextPreviewWidget(this, "A1111 Parameters Preview", 210);
+                const status = addTextLabel(this, "Metadata Status", "Idle");
+
+                const buildPreview = () => {
+                    const pos = String(getWidget(this, "positive_prompt_override", "") || "").trim();
+                    const neg = String(getWidget(this, "negative_prompt_override", "") || "").trim();
+                    const extra = String(getWidget(this, "extra_metadata", "") || "").trim();
+                    const withHash = !!getWidget(this, "include_lora_hashes", true);
+                    const debug = !!getWidget(this, "debug_sidecar", false);
+                    const lines = [];
+                    lines.push(pos || "(auto-extract positive prompt from graph)");
+                    lines.push("");
+                    lines.push(`Negative prompt: ${neg || "(auto-extract)"}`);
+                    lines.push("Steps: (auto), Sampler: (auto), Schedule type: (auto), CFG scale: (auto), Seed: (auto), Size: (auto)");
+                    if (extra) lines.push(extra);
+                    lines.push(withHash ? "Lora hashes: enabled (if files are resolvable)" : "Lora hashes: disabled");
+                    lines.push(debug ? "Debug sidecar: ON (.parameters.txt + .metadata_debug.json)" : "Debug sidecar: OFF");
+                    preview.value = lines.join("\n");
+                    status.value = "Preview updated";
+                    this.setDirtyCanvas(true, true);
+                };
+
+                this.addWidget("button", "Refresh metadata preview", null, buildPreview);
+                this.addWidget("button", "Copy A1111 format hint", null, () => {
+                    const sample = "positive prompt\n<lora:ModelName:1>\n\nNegative prompt: ...\nSteps: 20, Sampler: Euler, CFG scale: 7, Seed: 1, Size: 1024x1024";
+                    navigator.clipboard?.writeText(sample).catch(() => { });
+                    alert("Copied A1111 metadata sample to clipboard.");
+                });
+
+                for (const name of ["filename_prefix", "positive_prompt_override", "negative_prompt_override", "extra_metadata", "include_lora_hashes", "debug_sidecar"]) {
+                    const w = widget(this, name);
+                    if (!w) continue;
+                    const old = w.callback;
+                    w.callback = (v) => {
+                        old?.call(w, v);
+                        buildPreview();
+                    };
+                }
+
+                info.value = "Save node writes parameters + preserves prompt/workflow for ComfyUI reload.";
+                buildPreview();
+            };
+        }
+
         if (comfyClass === "Prompt_To_PNG_Meta") {
             const orig = nodeType.prototype.onNodeCreated;
             nodeType.prototype.onNodeCreated = function () {

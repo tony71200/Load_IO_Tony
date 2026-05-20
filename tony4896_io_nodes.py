@@ -19,6 +19,7 @@ from .nodes.load_image_batches_node import LoadImageBatches
 from .nodes.save_txt_node import SaveTxt, _save_txt
 from .nodes.text_splitter_node import TextSplitter, _split_text_file
 from .nodes.prompt_meta_node import PromptToPNGMeta
+from .nodes.save_image_a1111_metadata_node import SaveImageA1Metadata
 
 WEB_DIRECTORY = "./web"
 
@@ -28,6 +29,7 @@ NODE_CLASS_MAPPINGS = {
     "Text_Splitter": TextSplitter,
     "Save_Txt": SaveTxt,
     "Prompt_To_PNG_Meta": PromptToPNGMeta,
+    "SaveImageA1Metadata": SaveImageA1Metadata,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -36,6 +38,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "Text_Splitter": "Text_Splitter",
     "Save_Txt": "Save_Txt",
     "Prompt_To_PNG_Meta": "Prompt_To_PNG_Meta",
+    "SaveImageA1Metadata": "Save Image A1111 Metadata",
 }
 
 try:
