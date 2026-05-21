@@ -593,19 +593,13 @@ app.registerExtension({
             nodeType.prototype.onNodeCreated = function () {
                 orig?.apply(this, arguments);
                 this.title = "Save_Txt";
-                const info = addTextLabel(this, "Character count", "0");
-                const preview = addTextPreviewWidget(this, "Preview text");
-                const syncPreview = () => {
-                    const text = String(getWidget(this, "text", "") || "");
-                    preview.value = text;
-                    info.value = `${text.length} character(s)`;
-                    this.setDirtyCanvas(true, true);
-                };
+                addTextLabel(this, "Source", "Text is now extracted from 'source' input");
                 this.addWidget("button", "Save TXT", null, async () => {
                     try {
-                        if (!confirm("Save TXT now?")) { setWidget(this, "manual_save_token", ""); return; }
+                        alert("Manual 'Save TXT' button supports only direct text input.\nFor source-based extraction, run the workflow queue.");
+                        if (!confirm("Save empty TXT now?")) { setWidget(this, "manual_save_token", ""); return; }
                         const data = await postJSON("/tony4896_io/save_txt", {
-                            text: getWidget(this, "text", ""),
+                            text: "",
                             output_dir: getWidget(this, "output_dir", ""),
                             file_name: getWidget(this, "file_name", ""),
                             filename_prefix: getWidget(this, "filename_prefix", "ComfyUI"),
@@ -614,11 +608,6 @@ app.registerExtension({
                         alert(`Saved:\n${data.path}`);
                     } catch (e) { alert(e.message); }
                 });
-                for (const name of ["text", "file_name", "output_dir", "filename_prefix", "mode"]) {
-                    const w = widget(this, name);
-                    if (w) { const old = w.callback; w.callback = (v) => { old?.call(w, v); syncPreview(); }; }
-                }
-                syncPreview();
             };
         }
 
