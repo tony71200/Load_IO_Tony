@@ -622,6 +622,15 @@ app.registerExtension({
             };
         }
 
+
+        if (comfyClass === "SaveImageA1Metadata") {
+            const orig = nodeType.prototype.onNodeCreated;
+            nodeType.prototype.onNodeCreated = function () {
+                orig?.apply(this, arguments);
+                this.title = "Save Image A1111 Metadata";
+            };
+        }
+
         if (comfyClass === "Prompt_To_PNG_Meta") {
             const orig = nodeType.prototype.onNodeCreated;
             nodeType.prototype.onNodeCreated = function () {
