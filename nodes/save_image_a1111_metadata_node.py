@@ -1,3 +1,6 @@
+import os
+from time import time
+import logging
 import hashlib
 import json
 import re
@@ -19,6 +22,55 @@ try:
     import folder_paths
 except Exception:  # pragma: no cover - for non-ComfyUI test environments
     folder_paths = None
+
+def get_save_image_path(filename_prefix: str, output_dir: str, image_width=0, image_height=0) -> tuple[str, str, int, str, str]:
+    def map_filename(filename: str) -> tuple[int, str]:
+        prefix_len = len(os.path.basename(filename_prefix))
+        prefix = filename[:prefix_len + 1]
+        try:
+            remainder = filename[prefix_len + 1:]
+            base_remainder = remainder.split('.')[0]
+            digits = int(base_remainder.split('_')[0])
+        except:
+            digits = 0
+        return digits, prefix
+
+    def compute_vars(input: str, image_width: int, image_height: int) -> str:
+        input = input.replace("%width%", str(image_width))
+        input = input.replace("%height%", str(image_height))
+        now = time.localtime()
+        input = input.replace("%year%", str(now.tm_year))
+        input = input.replace("%month%", str(now.tm_mon).zfill(2))
+        input = input.replace("%day%", str(now.tm_mday).zfill(2))
+        input = input.replace("%hour%", str(now.tm_hour).zfill(2))
+        input = input.replace("%minute%", str(now.tm_min).zfill(2))
+        input = input.replace("%second%", str(now.tm_sec).zfill(2))
+        return input
+
+    if "%" in filename_prefix:
+        filename_prefix = compute_vars(filename_prefix, image_width, image_height)
+
+    subfolder = os.path.dirname(os.path.normpath(filename_prefix))
+    filename = os.path.basename(os.path.normpath(filename_prefix))
+
+    full_output_folder = os.path.join(output_dir, subfolder)
+
+    if os.path.commonpath((output_dir, os.path.abspath(full_output_folder))) != output_dir:
+        err = "**** ERROR: Saving image outside the output folder is not allowed." + \
+              "\n full_output_folder: " + os.path.abspath(full_output_folder) + \
+              "\n         output_dir: " + output_dir + \
+              "\n         commonpath: " + os.path.commonpath((output_dir, os.path.abspath(full_output_folder)))
+        logging.error(err)
+        raise Exception(err)
+
+    try:
+        counter = max(filter(lambda a: os.path.normcase(a[1][:-1]) == os.path.normcase(filename) and a[1][-1] == "_", map(map_filename, os.listdir(full_output_folder))))[0] + 1
+    except ValueError:
+        counter = 1
+    except FileNotFoundError:
+        os.makedirs(full_output_folder, exist_ok=True)
+        counter = 1
+    return full_output_folder, filename, counter, subfolder, filename_prefix
 
 
 class PromptGraphResolverTony4896:
@@ -100,7 +152,7 @@ class SaveImageA1Metadata:
         return {
             "required": {
                 "images": ("IMAGE",),
-                "filename_prefix": ("STRING", {"default": "ZImage_%date:yyyy_MM_dd%/ZImage_%date:yyyy_MM_dd_HHmmss%_%Text_Splitter.index%_%KSampler.seed%"}),
+                "filename_prefix": ("STRING", {"default": "ZImage_%date:yyyy_MM_dd%/ZImage_%date:yyyy_MM_dd_hhmmss%_%TextSplitter.index%_%KSampler.seed%"}),
             },
             "optional": {
                 "positive_prompt_override": ("STRING", {"multiline": True, "default": ""}),
@@ -119,6 +171,8 @@ class SaveImageA1Metadata:
     FUNCTION = "save_images"
     CATEGORY = "Tony4896/IO"
     OUTPUT_NODE = True
+    DESCRIPTION = "Saves the input images to your output directory with A1111 format metadata."
+    SEARCH_ALIASES = ["save", "save image", "export image", "save with metadata", "save with parameters"]
 
     def __init__(self):
         self.output_dir = folder_paths.get_output_directory() if folder_paths else "."
@@ -205,6 +259,7 @@ class SaveImageA1Metadata:
             return None
 
     def save_images(self, images, filename_prefix="Tony4896/A1111", positive_prompt_override="", negative_prompt_override="", extra_metadata="", include_lora_hashes=True, debug_sidecar=False, prompt=None, extra_pnginfo=None):
+        filename_prefix += self.prefix_append
         prompt = prompt or {}
         extra_pnginfo = extra_pnginfo or {}
 
@@ -251,15 +306,19 @@ class SaveImageA1Metadata:
         parts.append(", ".join([p for p in params if p and not p.endswith(": ")]))
         parameters_text = "\n".join(parts).strip()
 
-        filename_prefix = self._expand_date_tokens(filename_prefix + self.prefix_append)
+        # filename_prefix = self._expand_date_tokens(filename_prefix + self.prefix_append)
 
         if folder_paths:
             full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
                 filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0]
             )
         else:
-            full_output_folder, filename, counter, subfolder = ".", "image", 1, ""
+            # full_output_folder, filename, counter, subfolder = ".", "image", 1, ""
+            full_output_folder, filename, counter, subfolder, filename_prefix = get_save_image_path(
+                filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0]
+            )
             Path(full_output_folder).mkdir(parents=True, exist_ok=True)
+            print(f"Warning: folder_paths module not found, saving to current directory with filename prefix '{filename_prefix}'")
 
         results = []
         for batch_number, image in enumerate(images):
