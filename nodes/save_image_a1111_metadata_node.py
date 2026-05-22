@@ -286,7 +286,7 @@ class SaveImageA1Metadata:
                 if isinstance(value, (list, tuple, dict)):
                     continue
                 return normalize_for_filename(value)
-            return match.group(0)
+            return ""
 
         return token_pattern.sub(resolve_token, text)
 
@@ -338,7 +338,7 @@ class SaveImageA1Metadata:
         parts.append(", ".join([p for p in params if p and not p.endswith(": ")]))
         parameters_text = "\n".join(parts).strip()
 
-        filename_prefix = self._expand_date_tokens(filename_prefix)
+        # filename_prefix = self._expand_date_tokens(filename_prefix)
         filename_prefix = self._expand_graph_tokens(filename_prefix, prompt)
 
         if folder_paths:
@@ -369,7 +369,7 @@ class SaveImageA1Metadata:
                         metadata.add_text(key, json.dumps(value))
 
             filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
-            file = f"{filename_with_batch_num}_{counter:05}_.png"
+            file = f"{filename_with_batch_num}_{counter:05}.png"
             out_path = Path(full_output_folder) / file
             img.save(out_path, pnginfo=metadata, compress_level=self.compress_level)
 
