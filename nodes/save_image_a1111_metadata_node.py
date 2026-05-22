@@ -233,6 +233,7 @@ class SaveImageA1Metadata:
                 "yyyy": f"{now.year:04d}",
                 "MM": f"{now.month:02d}",
                 "dd": f"{now.day:02d}",
+                "hh": f"{now.hour:02d}",
                 "HH": f"{now.hour:02d}",
                 "mm": f"{now.minute:02d}",
                 "ss": f"{now.second:02d}",
@@ -257,6 +258,37 @@ class SaveImageA1Metadata:
             return h.hexdigest()[:12]
         except Exception:
             return None
+
+    @staticmethod
+    def _expand_graph_tokens(text, prompt):
+        if not isinstance(text, str) or "%" not in text:
+            return text
+
+        prompt = prompt or {}
+        token_pattern = re.compile(r"%([A-Za-z0-9_ \-]+)\.([A-Za-z0-9_]+)%")
+
+        def normalize_for_filename(value):
+            safe = str(value)
+            safe = safe.replace("\\", "_").replace("/", "_")
+            safe = re.sub(r'[:*?"<>|]+', "_", safe)
+            return safe.strip()
+
+        def resolve_token(match):
+            node_type = match.group(1).strip()
+            input_name = match.group(2).strip()
+            for node in prompt.values():
+                if node.get("class_type") != node_type:
+                    continue
+                inputs = node.get("inputs", {})
+                if input_name not in inputs:
+                    continue
+                value = inputs.get(input_name)
+                if isinstance(value, (list, tuple, dict)):
+                    continue
+                return normalize_for_filename(value)
+            return match.group(0)
+
+        return token_pattern.sub(resolve_token, text)
 
     def save_images(self, images, filename_prefix="Tony4896/A1111", positive_prompt_override="", negative_prompt_override="", extra_metadata="", include_lora_hashes=True, debug_sidecar=False, prompt=None, extra_pnginfo=None):
         filename_prefix += self.prefix_append
@@ -306,7 +338,8 @@ class SaveImageA1Metadata:
         parts.append(", ".join([p for p in params if p and not p.endswith(": ")]))
         parameters_text = "\n".join(parts).strip()
 
-        # filename_prefix = self._expand_date_tokens(filename_prefix + self.prefix_append)
+        filename_prefix = self._expand_date_tokens(filename_prefix)
+        filename_prefix = self._expand_graph_tokens(filename_prefix, prompt)
 
         if folder_paths:
             full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(
