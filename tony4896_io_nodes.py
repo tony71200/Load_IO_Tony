@@ -16,6 +16,7 @@ from .nodes.common import (
 )
 from .nodes.load_image_node import LoadImage
 from .nodes.load_image_batches_node import LoadImageBatches
+from .nodes.load_imagetext_batches_node import LoadImageTextBatch
 from .nodes.save_txt_node import SaveTxt, _save_txt
 from .nodes.text_splitter_node import TextSplitter, _split_text_file
 from .nodes.prompt_meta_node import PromptToPNGMeta
@@ -26,6 +27,7 @@ WEB_DIRECTORY = "./web"
 NODE_CLASS_MAPPINGS = {
     "Load_Image": LoadImage,
     "Load_Image_Batches": LoadImageBatches,
+    "Load_Image_Text_Batch": LoadImageTextBatch,
     "Text_Splitter": TextSplitter,
     "Save_Txt": SaveTxt,
     "Prompt_To_PNG_Meta": PromptToPNGMeta,
@@ -35,6 +37,7 @@ NODE_CLASS_MAPPINGS = {
 NODE_DISPLAY_NAME_MAPPINGS = {
     "Load_Image": "Load_Image",
     "Load_Image_Batches": "Load_Image_Batches",
+    "Load_Image_Text_Batch": "Load_Image_Text_Batch",
     "Text_Splitter": "Text_Splitter",
     "Save_Txt": "Save_Txt",
     "Prompt_To_PNG_Meta": "Prompt_To_PNG_Meta",
@@ -100,6 +103,54 @@ try:
                 raise ValueError("No supported image files were uploaded.")
             saved = sorted(saved, key=lambda x: x.lower())
             return web.json_response({"ok": True, "folder": str(folder), "virtual_folder": f"tony4896://folders/{batch}", "files": saved, "count": len(saved)})
+        except Exception as e:
+            return web.json_response({"ok": False, "error": str(e)}, status=500)
+
+    @PromptServer.instance.routes.post("/tony4896_io/upload_image_text_folder")
+    async def upload_image_text_folder_endpoint(request):
+        try:
+            reader = await request.multipart()
+            batch = uuid.uuid4().hex
+            folder = TEMP_ROOT / "image_text_folders" / batch
+            folder.mkdir(parents=True, exist_ok=True)
+            saved_images = []
+            saved_txt = []
+            while True:
+                field = await reader.next()
+                if field is None:
+                    break
+                if field.name != "files":
+                    continue
+                name = _safe_upload_filename(field.filename or f"{uuid.uuid4().hex}")
+                suffix = Path(name).suffix.lower()
+                if suffix not in IMAGE_EXTENSIONS and suffix != ".txt":
+                    while await field.read_chunk():
+                        pass
+                    continue
+                dst = folder / name
+                if dst.exists():
+                    dst = folder / f"{dst.stem}_{uuid.uuid4().hex[:8]}{dst.suffix}"
+                await _save_uploaded_file(field, dst)
+                if dst.suffix.lower() == ".txt":
+                    saved_txt.append(os.path.basename(dst))
+                else:
+                    saved_images.append(os.path.basename(dst))
+            if not saved_images:
+                raise ValueError("No supported image files were uploaded.")
+            saved_images = sorted(saved_images, key=lambda x: x.lower())
+            saved_txt = sorted(saved_txt, key=lambda x: x.lower())
+            virtual_folder = f"tony4896://image_text_folders/{batch}"
+            return web.json_response({
+                "ok": True,
+                "folder": str(folder),
+                "txt_folder": str(folder),
+                "virtual_folder": virtual_folder,
+                "virtual_txt_folder": virtual_folder,
+                "files": saved_images,
+                "txt_files": saved_txt,
+                "count": len(saved_images),
+                "txt_count": len(saved_txt),
+            })
         except Exception as e:
             return web.json_response({"ok": False, "error": str(e)}, status=500)
 
