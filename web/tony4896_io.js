@@ -231,7 +231,7 @@ async function refreshImage(node, previewWidget, infoWidget = null, batch = fals
     img.src = apiURL(`/tony4896_io/view_image?${viewParams.toString()}`);
     node.setDirtyCanvas(true, true);
 }
-async function refreshTextSplitter(node, posPreview, negPreview, infoWidget = null) {
+async function refreshTextSplitter(node, posPreview, negPreview, infoWidget = null, totalWidget = null) {
     const q = new URLSearchParams({
         txt_path: getWidget(node, "txt_path", ""),
         paragraph_sep: getWidget(node, "paragraph_sep", "\\n\\n"),
@@ -242,7 +242,38 @@ async function refreshTextSplitter(node, posPreview, negPreview, infoWidget = nu
     posPreview.value = data.positive || "";
     negPreview.value = data.negative || "";
     if (infoWidget) infoWidget.value = `index ${data.current_index + 1}/${data.count} | next=${data.next_index} | has=${data.has_index}`;
+    if (totalWidget) totalWidget.value = `${data.count} prompt(s)`;
     node.setDirtyCanvas(true, true);
+}
+async function uploadJson() {
+    const files = await pickFiles({ accept: ".json,application/json" });
+    if (!files.length) return null;
+    const form = new FormData();
+    form.append("file", files[0], files[0].name);
+    return await postForm("/tony4896_io/upload_json", form);
+}
+function jsonBatchQuery(node) {
+    return new URLSearchParams({
+        json_path: getWidget(node, "json_path", ""),
+        list_key: getWidget(node, "list_key", "prompts"),
+        text_key: getWidget(node, "text_key", "text"),
+        index: getWidget(node, "index", 0),
+    });
+}
+async function refreshJsonBatch(node, preview, infoWidget, totalWidget) {
+    const data = await getJSON(`/tony4896_io/json_batch_info?${jsonBatchQuery(node).toString()}`);
+    preview.value = data.prompt || "";
+    infoWidget.value = `index ${data.current_index + 1}/${data.count} | prompt_index=${data.prompt_index} | has=${data.has_index}`;
+    totalWidget.value = `${data.count} prompt(s)`;
+    node.setDirtyCanvas(true, true);
+}
+// Re-run a node's preview refresh after a workflow load restores widget values.
+function refreshOnConfigure(nodeType) {
+    const orig = nodeType.prototype.onConfigure;
+    nodeType.prototype.onConfigure = function () {
+        orig?.apply(this, arguments);
+        this.__tonyRefresh?.().catch(() => { });
+    };
 }
 
 
@@ -316,6 +347,10 @@ async function getAutoBatchCount(node, kind) {
             index: getWidget(node, "index", 0),
         });
         const data = await getJSON(`/tony4896_io/text_split_info?${q.toString()}`);
+        return Number(data.count || 0);
+    }
+    if (kind === "json_batch") {
+        const data = await getJSON(`/tony4896_io/json_batch_info?${jsonBatchQuery(node).toString()}`);
         return Number(data.count || 0);
     }
     throw new Error(`Unsupported auto batch kind: ${kind}`);
@@ -496,6 +531,7 @@ app.registerExtension({
                     const folder = getWidget(this, "folder_path", "");
                     if (!folder) return;
                     const data = await refreshFolderList(this, folder, "index");
+                    total.value = `${data?.count || 0} image(s)`;
                     if (!data?.files?.length) return;
                     if (source === "file_name") {
                         const currentName = String(getWidget(this, "file_name", "") || "");
@@ -514,7 +550,7 @@ app.registerExtension({
                         setWidgetSilent(this, "folder_path", data.folder);
                         setWidgetSilent(this, "index", 0);
                         setWidgetSilent(this, "file_name", data.files[0]);
-                        info.value = `${data.count} image(s)`;
+                        total.value = `${data.count} image(s)`;
                         await refreshImage(this, preview, info, true);
                     } catch (e) { alert(e.message); }
                 });
@@ -548,8 +584,11 @@ app.registerExtension({
                     }
                 };
                 const preview = addPreviewWidget(this);
+                const total = addTextLabel(this, "Total Images", "");
                 const info = addTextLabel(this, "width x height", "");
+                this.__tonyRefresh = async () => { await syncBatchSelection("index"); await refreshImage(this, preview, info, true); };
             };
+            refreshOnConfigure(nodeType);
         }
         if (comfyClass === "Load_Image_Text_Batch") {
             const orig = nodeType.prototype.onNodeCreated;
@@ -564,13 +603,14 @@ app.registerExtension({
                         this.setDirtyCanvas(true, true);
                         return;
                     }
-                    const q = new URLSearchParams({ folder });
+                    const q = new URLSearchParams({ folder, txt_folder: getWidget(this, "txt_folder_path", "") });
                     const data = await getJSON(`/tony4896_io/list_images?${q.toString()}`);
                     const count = Number(data.count || 0);
                     const idx = count > 0 ? Math.max(0, Math.min(getNumberWidget(this, "index", 0), count - 1)) : 0;
-                    info.value = count > 0 ? `${count} image(s) | current ${idx + 1}/${count}` : "No image";
+                    info.value = count > 0 ? `${count} image(s) | ${data.pair_count || 0} pair(s) | current ${idx + 1}/${count}` : "No image";
                     this.setDirtyCanvas(true, true);
                 };
+                this.__tonyRefresh = updateInfo;
 
                 const openButton = this.addWidget("button", "Open Folder", null, async () => {
                     try {
@@ -579,14 +619,14 @@ app.registerExtension({
                         setWidgetSilent(this, "folder_path", data.virtual_folder || data.folder);
                         setWidgetSilent(this, "txt_folder_path", data.virtual_txt_folder || data.txt_folder || data.virtual_folder || data.folder);
                         setWidgetSilent(this, "index", 0);
-                        info.value = `${data.count} image(s), ${data.txt_count || 0} txt file(s)`;
-                        this.setDirtyCanvas(true, true);
+                        await updateInfo();
                     } catch (e) { alert(e.message); }
                 });
                 this.widgets = [openButton, ...this.widgets.filter(w => w !== openButton)];
 
                 addClearTempButton(this);
                 this.addWidget("number", "auto_delay_seconds", 0.0, () => { }, { min: 0, max: 900, step: 0.5 });
+                this.addWidget("number", "auto_max_runs", 0, () => { }, { min: 0, max: 999999, step: 1 });
                 const info = addTextLabel(this, "Image Text Info", "");
                 addTextLabel(this, "Auto Batch Status", "Idle");
                 this.addWidget("button", "Start Auto Batch", null, async () => {
@@ -607,20 +647,24 @@ app.registerExtension({
                     }
                 }
             };
+            refreshOnConfigure(nodeType);
         }
         if (comfyClass === "Text_Splitter") {
             const orig = nodeType.prototype.onNodeCreated;
             nodeType.prototype.onNodeCreated = function () {
                 orig?.apply(this, arguments);
                 this.title = "Text_Splitter";
+                const total = addTextLabel(this, "Total Prompts", "");
                 const info = addTextLabel(this, "Text Info", "");
+                const refresh = () => refreshTextSplitter(this, posPreview, negPreview, info, total);
+                this.__tonyRefresh = refresh;
                 this.addWidget("button", "Open TXT", null, async () => {
                     try {
                         const data = await uploadTxt();
                         if (!data) return;
                         setWidgetSilent(this, "txt_path", data.path);
                         setWidgetSilent(this, "index", 0);
-                        await refreshTextSplitter(this, posPreview, negPreview, info);
+                        await refresh();
                     } catch (e) { alert(e.message); }
                 });
                 addClearTempButton(this);
@@ -633,35 +677,64 @@ app.registerExtension({
                 addTextLabel(this, "Auto Batch Status", "Idle");
                 this.addWidget("button", "Start Auto Batch", null, async () => {
                     try {
-                        await startAutoBatch(this, "text_batch", async () => refreshTextSplitter(this, posPreview, negPreview, info));
+                        await startAutoBatch(this, "text_batch", refresh);
                     } catch (e) { alert(e.message); }
                 });
                 this.addWidget("button", "Stop Auto Batch", null, () => stopAutoBatch("Stopped by user"));
                 const posPreview = addTextPreviewWidget(this, "Preview Positive Prompt");
                 const negPreview = addTextPreviewWidget(this, "Preview Negative Prompt");
-
-                // addClearTempButton(this);
-                // this.addWidget("button", "Apply Next Index Manually", null, () => {
-                //     const current = Number(getWidget(this, "index", 0) || 0);
-                //     setWidget(this, "index", current + 1);
-                // });
-                // this.addWidget("number", "auto_delay_seconds", 1.0, () => { }, { min: 0, max: 900, step: 0.5 });
-                // this.addWidget("number", "auto_max_runs", 0, () => { }, { min: 0, max: 999999, step: 1 });
-                // addTextLabel(this, "Auto Batch Status", "Idle");
-                // this.addWidget("button", "Start Auto Batch", null, async () => {
-                //     try {
-                //         await startAutoBatch(this, "text_batch", async () => refreshTextSplitter(this, posPreview, negPreview, info));
-                //     } catch (e) { alert(e.message); }
-                // });
-                // this.addWidget("button", "Stop Auto Batch", null, () => stopAutoBatch("Stopped by user"));
-                // for (const name of ["txt_path", "paragraph_sep", "negative_sep", "index"]) {
-                //     const w = widget(this, name);
-                //     if (w) {
-                //         const old = w.callback;
-                //         w.callback = async (v) => { old?.call(w, v); try { await refreshTextSplitter(this, posPreview, negPreview, info); } catch (_) { } };
-                //     }
-                // }
+                for (const name of ["txt_path", "paragraph_sep", "negative_sep", "index"]) {
+                    const w = widget(this, name);
+                    if (w) {
+                        const old = w.callback;
+                        w.callback = async (v) => { old?.call(w, v); try { await refresh(); } catch (_) { } };
+                    }
+                }
             };
+            refreshOnConfigure(nodeType);
+        }
+        if (comfyClass === "Json_Batch") {
+            const orig = nodeType.prototype.onNodeCreated;
+            nodeType.prototype.onNodeCreated = function () {
+                orig?.apply(this, arguments);
+                this.title = "Json_Batch";
+                const total = addTextLabel(this, "Total Prompts", "");
+                const info = addTextLabel(this, "Json Info", "");
+                const refresh = () => refreshJsonBatch(this, preview, info, total);
+                this.__tonyRefresh = refresh;
+                this.addWidget("button", "Open JSON", null, async () => {
+                    try {
+                        const data = await uploadJson();
+                        if (!data) return;
+                        setWidgetSilent(this, "json_path", data.path);
+                        setWidgetSilent(this, "index", 0);
+                        await refresh();
+                    } catch (e) { alert(e.message); }
+                });
+                addClearTempButton(this);
+                this.addWidget("button", "Apply Next Index Manually", null, () => {
+                    const current = Number(getWidget(this, "index", 0) || 0);
+                    setWidget(this, "index", current + 1);
+                });
+                this.addWidget("number", "auto_delay_seconds", 1.0, () => { }, { min: 0, max: 900, step: 0.5 });
+                this.addWidget("number", "auto_max_runs", 0, () => { }, { min: 0, max: 999999, step: 1 });
+                addTextLabel(this, "Auto Batch Status", "Idle");
+                this.addWidget("button", "Start Auto Batch", null, async () => {
+                    try {
+                        await startAutoBatch(this, "json_batch", refresh);
+                    } catch (e) { alert(e.message); }
+                });
+                this.addWidget("button", "Stop Auto Batch", null, () => stopAutoBatch("Stopped by user"));
+                const preview = addTextPreviewWidget(this, "Preview Prompt");
+                for (const name of ["json_path", "list_key", "text_key", "index"]) {
+                    const w = widget(this, name);
+                    if (w) {
+                        const old = w.callback;
+                        w.callback = async (v) => { old?.call(w, v); try { await refresh(); } catch (_) { } };
+                    }
+                }
+            };
+            refreshOnConfigure(nodeType);
         }
         if (comfyClass === "Save_Txt") {
             const orig = nodeType.prototype.onNodeCreated;

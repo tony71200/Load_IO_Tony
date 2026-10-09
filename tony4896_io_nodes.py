@@ -16,7 +16,8 @@ from .nodes.common import (
 )
 from .nodes.load_image_node import LoadImage
 from .nodes.load_image_batches_node import LoadImageBatches
-from .nodes.load_imagetext_batches_node import LoadImageTextBatch
+from .nodes.load_imagetext_batches_node import LoadImageTextBatch, _matching_txt_path
+from .nodes.json_batch_node import JsonBatch, _load_json_prompts
 from .nodes.save_txt_node import SaveTxt, _save_txt
 from .nodes.text_splitter_node import TextSplitter, _split_text_file
 from .nodes.prompt_meta_node import PromptToPNGMeta
@@ -29,6 +30,7 @@ NODE_CLASS_MAPPINGS = {
     "Load_Image_Batches": LoadImageBatches,
     "Load_Image_Text_Batch": LoadImageTextBatch,
     "Text_Splitter": TextSplitter,
+    "Json_Batch": JsonBatch,
     "Save_Txt": SaveTxt,
     "Prompt_To_PNG_Meta": PromptToPNGMeta,
     "SaveImageA1Metadata": SaveImageA1Metadata,
@@ -39,6 +41,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "Load_Image_Batches": "Load_Image_Batches",
     "Load_Image_Text_Batch": "Load_Image_Text_Batch",
     "Text_Splitter": "Text_Splitter",
+    "Json_Batch": "Json_Batch",
     "Save_Txt": "Save_Txt",
     "Prompt_To_PNG_Meta": "Prompt_To_PNG_Meta",
     "SaveImageA1Metadata": "Save Image A1111 Metadata",
@@ -171,10 +174,29 @@ try:
         except Exception as e:
             return web.json_response({"ok": False, "error": str(e)}, status=500)
 
+    @PromptServer.instance.routes.post("/tony4896_io/upload_json")
+    async def upload_json_endpoint(request):
+        try:
+            reader = await request.multipart()
+            field = await reader.next()
+            if field is None or field.name != "file":
+                raise ValueError("Expected multipart field named 'file'.")
+            name = _safe_upload_filename(field.filename or f"{uuid.uuid4().hex}.json", ".json")
+            if not name.lower().endswith(".json"):
+                raise ValueError("Only .json files are supported.")
+            batch = uuid.uuid4().hex
+            dst = TEMP_ROOT / "json" / batch / name
+            await _save_uploaded_file(field, dst)
+            return web.json_response({"ok": True, "path": str(dst), "virtual_path": f"tony4896://json/{batch}/{name}", "name": name})
+        except Exception as e:
+            return web.json_response({"ok": False, "error": str(e)}, status=500)
+
     @PromptServer.instance.routes.get("/tony4896_io/list_images")
     async def list_images_endpoint(request):
         images = _list_images(request.query.get("folder", ""))
-        return web.json_response({"ok": True, "files": [{"name": os.path.basename(p), "path": p} for p in images], "count": len(images)})
+        txt_folder = request.query.get("txt_folder", "")
+        pair_count = sum(1 for p in images if _matching_txt_path(p, txt_folder) is not None)
+        return web.json_response({"ok": True, "files": [{"name": os.path.basename(p), "path": p} for p in images], "count": len(images), "pair_count": pair_count})
 
     @PromptServer.instance.routes.get("/tony4896_io/image_info")
     async def image_info_endpoint(request):
@@ -215,6 +237,18 @@ try:
             idx = max(0, min(int(request.query.get("index", "0") or 0), len(items) - 1))
             pos, neg = items[idx]
             return web.json_response({"ok": True, "count": len(items), "current_index": idx, "next_index": idx + 1, "has_index": (idx + 1) < len(items), "positive": pos, "negative": neg})
+        except Exception as e:
+            return web.json_response({"ok": False, "error": str(e)}, status=500)
+
+    @PromptServer.instance.routes.get("/tony4896_io/json_batch_info")
+    async def json_batch_info_endpoint(request):
+        try:
+            items = _load_json_prompts(request.query.get("json_path", ""), request.query.get("list_key", "prompts"), request.query.get("text_key", "text"))
+            if not items:
+                raise ValueError("JSON list is empty.")
+            idx = max(0, min(int(request.query.get("index", "0") or 0), len(items) - 1))
+            text, prompt_index = items[idx]
+            return web.json_response({"ok": True, "count": len(items), "current_index": idx, "next_index": idx + 1, "has_index": (idx + 1) < len(items), "prompt": text, "prompt_index": prompt_index})
         except Exception as e:
             return web.json_response({"ok": False, "error": str(e)}, status=500)
 

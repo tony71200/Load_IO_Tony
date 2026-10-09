@@ -36,6 +36,14 @@ class TextSplitter:
     FUNCTION = "split"
     CATEGORY = "Tony4896/IO"
 
+    @classmethod
+    def IS_CHANGED(cls, txt_path, paragraph_sep, negative_sep, index):
+        try:
+            st = Path(_normalize_path(txt_path)).stat()
+            return f"{txt_path}:{st.st_mtime_ns}:{st.st_size}:{paragraph_sep}:{negative_sep}:{index}"
+        except OSError:
+            return float("nan")
+
     def split(self, txt_path, paragraph_sep, negative_sep, index):
         items = _split_text_file(txt_path, paragraph_sep, negative_sep)
         if not items:

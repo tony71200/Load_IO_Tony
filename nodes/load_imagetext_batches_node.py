@@ -42,8 +42,8 @@ class LoadImageTextBatch:
             "index": ("INT", {"default": 0, "min": 0, "max": 999999, "step": 1}),
         }}
 
-    RETURN_TYPES = ("IMAGE", "STRING", "STRING", "INT")
-    RETURN_NAMES = ("image", "positive", "negative", "index")
+    RETURN_TYPES = ("IMAGE", "STRING", "STRING", "INT", "INT", "BOOLEAN")
+    RETURN_NAMES = ("image", "positive", "negative", "index", "next_index", "has_index")
     FUNCTION = "load_batch"
     CATEGORY = "Tony4896/IO"
 
@@ -82,4 +82,4 @@ class LoadImageTextBatch:
             positive = positive_prompt or ""
             negative = negative_prompt or ""
 
-        return (tensor, positive, negative, idx)
+        return (tensor, positive, negative, idx, idx + 1, (idx + 1) < len(images))
