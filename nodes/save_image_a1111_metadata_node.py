@@ -302,7 +302,15 @@ class SaveImageA1Metadata:
             neg = negative_prompt_override
 
         sampler_id, sampler = self._find_sampler(prompt)
-        sin = sampler.get("inputs", {}) if sampler else {}
+        sin = dict(sampler.get("inputs", {})) if sampler else {}
+        # Sampler params fed by a link (e.g. PrimitiveInt seed) -> follow to the source node's literal value
+        for key, value in sin.items():
+            for _ in range(8):
+                if not PromptGraphResolverTony4896._is_link(value):
+                    break
+                src = prompt.get(str(value[0]), {}).get("inputs", {})
+                value = src.get("value", src.get(key))
+            sin[key] = value
 
         loras = self._extract_loras(prompt)
         lora_tags = [f"<lora:{self._strip_ext(x['name'])}:{x['strength']}>" for x in loras]
