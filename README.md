@@ -15,20 +15,33 @@ Custom ComfyUI nodes for image/text batch IO.
    - Current index / next index / has index
    - Manual next index and JS auto batch runner
 
-3. **III. Text Splitter Batches (Tony4896)**
+3. **III. Load Image Text Batch (Tony4896)**
+   - Folder of images + matching `<stem>.txt` prompts (`###` splits positive/negative)
+   - Label shows total images and matched image/txt pairs
+   - Fallback positive/negative widgets when no txt matches
+
+4. **IV. Text Splitter Batches (Tony4896)**
    - TXT picker
    - Paragraph separator
    - Negative separator
    - Wrapped plaintext-style previews for positive and negative prompt
+   - Label shows total prompt count
 
-4. **IV. Save TXT (Tony4896)**
+5. **V. Json Batch (Tony4896)**
+   - JSON picker for `prompt-collector` exports: `{"prompts": [{"index": 31, "text": "..."}, ...]}`
+   - `list_key` / `text_key` configurable (default `prompts` / `text`)
+   - Outputs: prompt, next_index, has_index, current_index, prompt_index (the item's own `index` field)
+
+6. **VI. Save TXT (Tony4896)**
    - Auto save / manual save
    - Output directory
    - File name / filename prefix
 
-5. **V. Delay Time (Tony4896)**
-   - Utility delay node
-   - Do not connect its output back to an upstream index input; ComfyUI graphs cannot contain cycles.
+7. **VII. Prompt To PNG Meta / Save Image A1111 Metadata (Tony4896)**
+   - Write prompt + LoRA tags into PNG metadata (A1111 / CivitAI format)
+
+All batch nodes share the JS auto batch runner (Start/Stop Auto Batch, `auto_delay_seconds`, `auto_max_runs`).
+Do not wire `next_index` back into `index`; ComfyUI graphs cannot contain cycles.
 
 ## v4 changes
 
