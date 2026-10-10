@@ -173,6 +173,16 @@ async function uploadFolderImages() {
     }
     return await postForm("/tony4896_io/upload_folder", form);
 }
+async function uploadFolderImageText() {
+    const files = await pickFiles({ accept: ".png,.jpg,.jpeg,.bmp,.webp,.tif,.tiff,.txt,image/*,text/plain", directory: true });
+    if (!files.length) return null;
+    const form = new FormData();
+    for (const f of files) {
+        const safeName = f.webkitRelativePath ? f.webkitRelativePath.split("/").pop() : f.name;
+        form.append("files", f, safeName);
+    }
+    return await postForm("/tony4896_io/upload_image_text_folder", form);
+}
 async function uploadTxt() {
     const files = await pickFiles({ accept: ".txt,text/plain" });
     if (!files.length) return null;
@@ -285,6 +295,13 @@ async function queuePromptCompat() {
 
 async function getAutoBatchCount(node, kind) {
     if (kind === "image_batch") {
+        const folderPath = getWidget(node, "folder_path", "");
+        if (!folderPath) throw new Error("folder_path is empty.");
+        const q = new URLSearchParams({ folder: folderPath });
+        const data = await getJSON(`/tony4896_io/list_images?${q.toString()}`);
+        return Number(data.count || 0);
+    }
+    if (kind === "image_text_batch") {
         const folderPath = getWidget(node, "folder_path", "");
         if (!folderPath) throw new Error("folder_path is empty.");
         const q = new URLSearchParams({ folder: folderPath });
@@ -495,8 +512,8 @@ app.registerExtension({
                         const data = await uploadFolderImages();
                         if (!data) return;
                         setWidgetSilent(this, "folder_path", data.folder);
-                        setWidgetSilent(this, "file_name", data.files[0]);
                         setWidgetSilent(this, "index", 0);
+                        setWidgetSilent(this, "file_name", data.files[0]);
                         info.value = `${data.count} image(s)`;
                         await refreshImage(this, preview, info, true);
                     } catch (e) { alert(e.message); }
@@ -534,6 +551,63 @@ app.registerExtension({
                 const info = addTextLabel(this, "width x height", "");
             };
         }
+        if (comfyClass === "Load_Image_Text_Batch") {
+            const orig = nodeType.prototype.onNodeCreated;
+            nodeType.prototype.onNodeCreated = function () {
+                orig?.apply(this, arguments);
+                this.title = "Load_Image_Text_Batch";
+
+                const updateInfo = async () => {
+                    const folder = getWidget(this, "folder_path", "");
+                    if (!folder) {
+                        info.value = "No folder";
+                        this.setDirtyCanvas(true, true);
+                        return;
+                    }
+                    const q = new URLSearchParams({ folder });
+                    const data = await getJSON(`/tony4896_io/list_images?${q.toString()}`);
+                    const count = Number(data.count || 0);
+                    const idx = count > 0 ? Math.max(0, Math.min(getNumberWidget(this, "index", 0), count - 1)) : 0;
+                    info.value = count > 0 ? `${count} image(s) | current ${idx + 1}/${count}` : "No image";
+                    this.setDirtyCanvas(true, true);
+                };
+
+                const openButton = this.addWidget("button", "Open Folder", null, async () => {
+                    try {
+                        const data = await uploadFolderImageText();
+                        if (!data) return;
+                        setWidgetSilent(this, "folder_path", data.virtual_folder || data.folder);
+                        setWidgetSilent(this, "txt_folder_path", data.virtual_txt_folder || data.txt_folder || data.virtual_folder || data.folder);
+                        setWidgetSilent(this, "index", 0);
+                        info.value = `${data.count} image(s), ${data.txt_count || 0} txt file(s)`;
+                        this.setDirtyCanvas(true, true);
+                    } catch (e) { alert(e.message); }
+                });
+                this.widgets = [openButton, ...this.widgets.filter(w => w !== openButton)];
+
+                addClearTempButton(this);
+                this.addWidget("number", "auto_delay_seconds", 0.0, () => { }, { min: 0, max: 900, step: 0.5 });
+                const info = addTextLabel(this, "Image Text Info", "");
+                addTextLabel(this, "Auto Batch Status", "Idle");
+                this.addWidget("button", "Start Auto Batch", null, async () => {
+                    try {
+                        await startAutoBatch(this, "image_text_batch", updateInfo);
+                    } catch (e) { alert(e.message); }
+                });
+                this.addWidget("button", "Stop Auto Batch", null, () => stopAutoBatch("Stopped by user"));
+
+                for (const name of ["folder_path", "txt_folder_path", "index"]) {
+                    const w = widget(this, name);
+                    if (w) {
+                        const old = w.callback;
+                        w.callback = async (v) => {
+                            old?.call(w, v);
+                            try { await updateInfo(); } catch (_) { }
+                        };
+                    }
+                }
+            };
+        }
         if (comfyClass === "Text_Splitter") {
             const orig = nodeType.prototype.onNodeCreated;
             nodeType.prototype.onNodeCreated = function () {
@@ -545,6 +619,7 @@ app.registerExtension({
                         const data = await uploadTxt();
                         if (!data) return;
                         setWidgetSilent(this, "txt_path", data.path);
+                        setWidgetSilent(this, "index", 0);
                         await refreshTextSplitter(this, posPreview, negPreview, info);
                     } catch (e) { alert(e.message); }
                 });
@@ -593,19 +668,13 @@ app.registerExtension({
             nodeType.prototype.onNodeCreated = function () {
                 orig?.apply(this, arguments);
                 this.title = "Save_Txt";
-                const info = addTextLabel(this, "Character count", "0");
-                const preview = addTextPreviewWidget(this, "Preview text");
-                const syncPreview = () => {
-                    const text = String(getWidget(this, "text", "") || "");
-                    preview.value = text;
-                    info.value = `${text.length} character(s)`;
-                    this.setDirtyCanvas(true, true);
-                };
+                addTextLabel(this, "Source", "Text is now extracted from 'source' input");
                 this.addWidget("button", "Save TXT", null, async () => {
                     try {
-                        if (!confirm("Save TXT now?")) { setWidget(this, "manual_save_token", ""); return; }
+                        alert("Manual 'Save TXT' button supports only direct text input.\nFor source-based extraction, run the workflow queue.");
+                        if (!confirm("Save empty TXT now?")) { setWidget(this, "manual_save_token", ""); return; }
                         const data = await postJSON("/tony4896_io/save_txt", {
-                            text: getWidget(this, "text", ""),
+                            text: "",
                             output_dir: getWidget(this, "output_dir", ""),
                             file_name: getWidget(this, "file_name", ""),
                             filename_prefix: getWidget(this, "filename_prefix", "ComfyUI"),
@@ -614,11 +683,15 @@ app.registerExtension({
                         alert(`Saved:\n${data.path}`);
                     } catch (e) { alert(e.message); }
                 });
-                for (const name of ["text", "file_name", "output_dir", "filename_prefix", "mode"]) {
-                    const w = widget(this, name);
-                    if (w) { const old = w.callback; w.callback = (v) => { old?.call(w, v); syncPreview(); }; }
-                }
-                syncPreview();
+            };
+        }
+
+
+        if (comfyClass === "SaveImageA1Metadata") {
+            const orig = nodeType.prototype.onNodeCreated;
+            nodeType.prototype.onNodeCreated = function () {
+                orig?.apply(this, arguments);
+                this.title = "Save Image A1111 Metadata";
             };
         }
 

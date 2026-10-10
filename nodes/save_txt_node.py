@@ -2,24 +2,86 @@ from pathlib import Path
 
 from .common import ANY, _clean_filename, _safe_mkdir
 
+try:
+    from comfy.cli_args import args
+except ImportError:
+    args = None
+
+try:
+    import folder_paths
+except ImportError:
+    folder_paths = None
+
 
 def _save_txt(text: str, output_dir: str, file_name: str = "", filename_prefix: str = "ComfyUI"):
+    # print(f"SaveTxt: Saving text with filename='{file_name}', output_dir='{output_dir}', filename_prefix='{filename_prefix}'")
     out_dir = _safe_mkdir(output_dir or ".")
     base = _clean_filename(file_name or filename_prefix or "ComfyUI")
     if not base.lower().endswith(".txt"):
         base += ".txt"
     out_path = str(Path(out_dir) / base)
+    # print(f"Saving text to: {out_path}")
     Path(out_path).write_text(text or "", encoding="utf-8")
     return out_path
+
+
+def _extract_text_from_source(value, _depth: int = 0) -> str:
+    if _depth > 8 or value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (bytes, bytearray)):
+        try:
+            return value.decode("utf-8", errors="ignore")
+        except Exception:
+            return str(value)
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+
+    if isinstance(value, dict):
+        preferred = [
+            "text", "response", "content", "output", "result", "message", "caption",
+        ]
+        for key in preferred:
+            if key in value:
+                found = _extract_text_from_source(value.get(key), _depth + 1)
+                if found:
+                    return found
+        for _, v in value.items():
+            found = _extract_text_from_source(v, _depth + 1)
+            if found:
+                return found
+        return ""
+
+    if isinstance(value, (list, tuple, set)):
+        parts = [_extract_text_from_source(v, _depth + 1) for v in value]
+        parts = [p for p in parts if p]
+        return "\n".join(parts)
+
+    for attr in ["text", "response", "content", "output", "result", "message"]:
+        if hasattr(value, attr):
+            found = _extract_text_from_source(getattr(value, attr), _depth + 1)
+            if found:
+                return found
+    return str(value)
 
 
 class SaveTxt:
     @classmethod
     def INPUT_TYPES(cls):
+        output_dir_default = "./output"
+        if args is not None:
+            if args.output_directory is None:
+                output_dir_default = "./output"
+            else:  #and getattr(args, "output_directory", "./output"):
+                output_dir_default = args.output_directory
+        # print(f"SaveTxt: Using default output directory: {output_dir_default}")
         return {"required": {
-            "source": (ANY,), "text": ("STRING", {"forceInput": True, "default": "", "multiline": True}),
-            "file_name": ("STRING", {"default": "", "multiline": False}), "mode": (["Auto save", "Manual save"], {"default": "Auto save"}),
-            "output_dir": ("STRING", {"default": "", "multiline": False}), "filename_prefix": ("STRING", {"default": "ComfyUI", "multiline": False}),
+            "source": (ANY,),
+            "file_name": ("STRING", {"default": "", "multiline": False}), 
+            "mode": (["Auto save", "Manual save"], {"default": "Auto save"}),
+            "output_dir": ("STRING", {"default": output_dir_default, "multiline": False}), 
+            "filename_prefix": ("STRING", {"default": "ComfyUI", "multiline": False}),
             "manual_save_token": ("STRING", {"default": "", "multiline": False}),
         }}
 
@@ -28,9 +90,10 @@ class SaveTxt:
     FUNCTION = "save"
     CATEGORY = "Tony4896/IO"
     OUTPUT_NODE = True
+    SEARCH_ALIASES = ["save", "save txt", "save text", "save string"]
 
-    def save(self, source, text, file_name, mode, output_dir, filename_prefix, manual_save_token):
-        text = "" if text is None else str(text)
+    def save(self, source, file_name, mode, output_dir, filename_prefix, manual_save_token):
+        text = _extract_text_from_source(source)
         if (mode or "Auto save") == "Auto save":
             return (text, True, _save_txt(text, output_dir, file_name, filename_prefix))
         return (text, True, manual_save_token) if manual_save_token else (text, False, "")
