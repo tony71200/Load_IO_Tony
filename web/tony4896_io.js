@@ -69,10 +69,41 @@ function pickFiles({ accept = "", multiple = false, directory = false } = {}) {
         input.click();
     });
 }
+// Read-only label drawn like a text widget. A disabled "text" widget hides its
+// value on the current frontend, so the pill is drawn here instead.
 function addTextLabel(node, name, defaultText = "") {
-    const w = node.addWidget("text", name, defaultText, () => { }, { serialize: false });
-    w.disabled = true;
-    return w;
+    const label = {
+        name, type: "custom", value: defaultText, serialize: false, options: { serialize: false },
+        computeSize(width) { return [width, 20]; },
+        draw(ctx, node, width, y) {
+            const h = 20, margin = 15;
+            ctx.save();
+            ctx.fillStyle = "#222";
+            ctx.strokeStyle = "#666";
+            ctx.beginPath();
+            ctx.roundRect(margin, y, width - margin * 2, h, h * 0.5);
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.rect(margin, y, width - margin * 2, h);
+            ctx.clip();
+            ctx.fillStyle = "#999";
+            ctx.textAlign = "left";
+            ctx.fillText(name, margin * 2, y + h * 0.7);
+            let text = String(this.value ?? "");
+            const maxValueW = width - margin * 4 - ctx.measureText(name).width - 8;
+            if (ctx.measureText(text).width > maxValueW) {
+                while (text.length && ctx.measureText(text + "…").width > maxValueW) text = text.slice(0, -1);
+                text += "…";
+            }
+            ctx.fillStyle = "#ddd";
+            ctx.textAlign = "right";
+            ctx.fillText(text, width - margin * 2, y + h * 0.7);
+            ctx.restore();
+        },
+    };
+    node.widgets.push(label);
+    return label;
 }
 function addPreviewWidget(node) {
     const preview = {
@@ -524,6 +555,7 @@ app.registerExtension({
             nodeType.prototype.onNodeCreated = function () {
                 orig?.apply(this, arguments);
                 this.title = "Load_Image_Batches";
+                const total = addTextLabel(this, "Total Images", "");
 
                 // const preview = addPreviewWidget(this);
                 // const info = addTextLabel(this, "width x height", "");
@@ -584,7 +616,6 @@ app.registerExtension({
                     }
                 };
                 const preview = addPreviewWidget(this);
-                const total = addTextLabel(this, "Total Images", "");
                 const info = addTextLabel(this, "width x height", "");
                 this.__tonyRefresh = async () => { await syncBatchSelection("index"); await refreshImage(this, preview, info, true); };
             };
@@ -595,10 +626,12 @@ app.registerExtension({
             nodeType.prototype.onNodeCreated = function () {
                 orig?.apply(this, arguments);
                 this.title = "Load_Image_Text_Batch";
+                const total = addTextLabel(this, "Total Images", "");
 
                 const updateInfo = async () => {
                     const folder = getWidget(this, "folder_path", "");
                     if (!folder) {
+                        total.value = "";
                         info.value = "No folder";
                         this.setDirtyCanvas(true, true);
                         return;
@@ -607,7 +640,8 @@ app.registerExtension({
                     const data = await getJSON(`/tony4896_io/list_images?${q.toString()}`);
                     const count = Number(data.count || 0);
                     const idx = count > 0 ? Math.max(0, Math.min(getNumberWidget(this, "index", 0), count - 1)) : 0;
-                    info.value = count > 0 ? `${count} image(s) | ${data.pair_count || 0} pair(s) | current ${idx + 1}/${count}` : "No image";
+                    total.value = `${count} image(s)`;
+                    info.value = count > 0 ? `${data.pair_count || 0} pair(s) | current ${idx + 1}/${count}` : "No image";
                     this.setDirtyCanvas(true, true);
                 };
                 this.__tonyRefresh = updateInfo;
