@@ -71,9 +71,12 @@ function pickFiles({ accept = "", multiple = false, directory = false } = {}) {
 }
 // Read-only label drawn like a text widget. A disabled "text" widget hides its
 // value on the current frontend, so the pill is drawn here instead.
+// Labels stay in widgets_values (only options.serialize keeps them out of the
+// prompt) because saved workflows map widgets_values by position. A label added
+// after the Total labels must set `serialize = false` so it takes no slot.
 function addTextLabel(node, name, defaultText = "") {
     const label = {
-        name, type: "custom", value: defaultText, serialize: false, options: { serialize: false },
+        name, type: "custom", value: defaultText, options: { serialize: false },
         computeSize(width) { return [width, 20]; },
         draw(ctx, node, width, y) {
             const h = 20, margin = 15;
@@ -556,6 +559,7 @@ app.registerExtension({
                 orig?.apply(this, arguments);
                 this.title = "Load_Image_Batches";
                 const total = addTextLabel(this, "Total Images", "");
+                total.serialize = false;
 
                 // const preview = addPreviewWidget(this);
                 // const info = addTextLabel(this, "width x height", "");
@@ -627,6 +631,7 @@ app.registerExtension({
                 orig?.apply(this, arguments);
                 this.title = "Load_Image_Text_Batch";
                 const total = addTextLabel(this, "Total Images", "");
+                total.serialize = false;
 
                 const updateInfo = async () => {
                     const folder = getWidget(this, "folder_path", "");
@@ -689,6 +694,7 @@ app.registerExtension({
                 orig?.apply(this, arguments);
                 this.title = "Text_Splitter";
                 const total = addTextLabel(this, "Total Prompts", "");
+                total.serialize = false;
                 const info = addTextLabel(this, "Text Info", "");
                 const refresh = () => refreshTextSplitter(this, posPreview, negPreview, info, total);
                 this.__tonyRefresh = refresh;
@@ -733,6 +739,7 @@ app.registerExtension({
                 orig?.apply(this, arguments);
                 this.title = "Json_Batch";
                 const total = addTextLabel(this, "Total Prompts", "");
+                total.serialize = false;
                 const info = addTextLabel(this, "Json Info", "");
                 const refresh = () => refreshJsonBatch(this, preview, info, total);
                 this.__tonyRefresh = refresh;
