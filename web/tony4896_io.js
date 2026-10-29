@@ -74,7 +74,7 @@ function pickFiles({ accept = "", multiple = false, directory = false } = {}) {
 // Labels stay in widgets_values (only options.serialize keeps them out of the
 // prompt) because saved workflows map widgets_values by position. A label added
 // after the Total labels must set `serialize = false` so it takes no slot.
-function addTextLabel(node, name, defaultText = "") {
+export function addTextLabel(node, name, defaultText = "") {
     const label = {
         name, type: "custom", value: defaultText, options: { serialize: false },
         computeSize(width) { return [width, 20]; },
