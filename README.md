@@ -74,3 +74,7 @@ ComfyUI/custom_nodes/Tony4896_IO/_tony4896_temp
 
 - Files are not uploaded to ComfyUI's `input` folder.
 - Use **Clear Tony Temp** to remove temporary uploaded files.
+
+## Find_and_Replace
+
+Replaces words in a prompt. `find` holds one or more alternatives separated by `|` (`2men|2male`), matched case-insensitively; `replace` is the replacement text. Connect a wire straight to `find` or `replace` to drive them from another node. The optional `replace_in` socket turns `replace` into a template: `{in}` is substituted with the connected value (`{in} and other guy` + `Ivan_Ryo` -> `Ivan_Ryo and other guy`); an empty `replace` uses the connected value as is.
