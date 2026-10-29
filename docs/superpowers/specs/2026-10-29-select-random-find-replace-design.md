@@ -46,7 +46,7 @@ Widget order on the node, top to bottom:
 
 1. `item_N` rows (custom canvas widgets, serialized)
 2. `➕ Add item` button (`serialize = false`, `options.serialize = false`)
-3. `Total Items` label drawn like the existing `addTextLabel` pill
+3. `Total Items` label reusing `addTextLabel` (exported from `web/tony4896_io.js`)
    (`serialize = false`, `options.serialize = false`)
 4. `index` number widget and its `control_after_generate` combo, both created
    by ComfyUI and moved to the end of `node.widgets`
@@ -68,7 +68,7 @@ Node-level behaviour:
 - `addItem(node, value = "")`: `N = ++node.__tonyItemCounter`, push the row
   widget, then move it before the Add button.
 - `syncItems(node)`: `n = count of item_ widgets`; `Total Items` label shows
-  `n`; `index.options.max = Math.max(0, n - 1)`; clamp `index.value`;
+  `n`; `index.options.max = n` (the randomize control draws from `[min, max)`, so `max = n` yields `0 ... n-1`); clamp `index.value`;
   `node.setSize([node.size[0], node.computeSize()[1]])` when the node grew;
   `setDirtyCanvas(true, true)`.
 - `onNodeCreated` wrapper (runs after ComfyUI created `index` and the control
@@ -79,14 +79,13 @@ Node-level behaviour:
   `n = widgets_values.length - (serialized non-item widgets)`, add `n` empty
   rows, then let the original `configure` assign values by position.
   After it returns, `syncItems`.
-- Row names are never renumbered after a removal; names only need to be
-  unique within the node. `__tonyItemCounter` is restored on configure as the
-  highest existing `N`.
+- Row names are never renumbered after a removal or reload; names only need
+  to be unique within the node, so `__tonyItemCounter` simply keeps counting up.
 
 Randomize semantics: ComfyUI's `control_after_generate` combo
 (`fixed | increment | decrement | randomize`) already randomizes within
-`[options.min, options.max]`, so keeping `options.max = n - 1` gives exactly
-`0 … n-1`. `fixed` pins one item. Default is `randomize`.
+`[options.min, options.max)` (max exclusive), so keeping `options.max = n` gives exactly
+`0 … n-1`; the Python side clamps a manually entered `n` to the last item. `fixed` pins one item. Default is `randomize`.
 
 ## Find_and_Replace
 
@@ -130,7 +129,7 @@ ComfyUI behaviour and needs no code: the connected value replaces the box.
   `"Find_and_Replace"` to both mappings with identical display names.
 - README: one short section per node under the existing node list.
 
-## Tests (pytest, same import style as `tests/test_json_batch.py`)
+## Tests (plain `python tests/<file>.py` with the venv Python, same runner as `tests/test_json_batch.py`; pytest is not installed)
 
 `tests/test_select_random.py`
 
