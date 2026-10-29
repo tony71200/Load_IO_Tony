@@ -178,3 +178,17 @@ def _load_image_tensor(path: str):
     arr = np.array(img).astype(np.float32) / 255.0
     tensor = torch.from_numpy(arr)[None,]
     return tensor, width, height
+
+
+class FlexibleOptionalInputType(dict):
+    # Optional-input dict that claims every key so the prompt may carry
+    # item_1, item_2, ... without declaring them (rgthree Power LoRA Loader trick).
+    def __init__(self, type_name):
+        super().__init__()
+        self.type_name = type_name
+
+    def __getitem__(self, key):
+        return (self.type_name,)
+
+    def __contains__(self, key):
+        return True

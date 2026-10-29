@@ -23,6 +23,7 @@ from .nodes.text_splitter_node import TextSplitter, _split_text_file
 from .nodes.prompt_meta_node import PromptToPNGMeta
 from .nodes.save_image_a1111_metadata_node import SaveImageA1Metadata
 from .nodes.find_replace_node import FindAndReplace
+from .nodes.select_random_node import SelectRandom
 
 WEB_DIRECTORY = "./web"
 
@@ -36,6 +37,7 @@ NODE_CLASS_MAPPINGS = {
     "Prompt_To_PNG_Meta": PromptToPNGMeta,
     "SaveImageA1Metadata": SaveImageA1Metadata,
     "Find_and_Replace": FindAndReplace,
+    "Select_Random": SelectRandom,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -48,6 +50,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "Prompt_To_PNG_Meta": "Prompt_To_PNG_Meta",
     "SaveImageA1Metadata": "Save Image A1111 Metadata",
     "Find_and_Replace": "Find_and_Replace",
+    "Select_Random": "Select_Random",
 }
 
 try:

@@ -78,3 +78,7 @@ ComfyUI/custom_nodes/Tony4896_IO/_tony4896_temp
 ## Find_and_Replace
 
 Replaces words in a prompt. `find` holds one or more alternatives separated by `|` (`2men|2male`), matched case-insensitively; `replace` is the replacement text. Connect a wire straight to `find` or `replace` to drive them from another node. The optional `replace_in` socket turns `replace` into a template: `{in}` is substituted with the connected value (`{in} and other guy` + `Ivan_Ryo` -> `Ivan_Ryo and other guy`); an empty `replace` uses the connected value as is.
+
+## Select_Random
+
+A list of trigger words, phrases or paragraphs; each queue outputs one of them. Click `Add item` to add a row, click a row to edit it in a multiline dialog, click `x` to remove it. `Total Items` shows the count. `index` is the picked row; with `control_after_generate` on `randomize` (default) ComfyUI draws a new index in `0 ... n-1` for every queue, `fixed` pins one row.
