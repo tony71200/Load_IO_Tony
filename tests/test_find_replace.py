@@ -12,7 +12,22 @@ def test_template_with_replace_in():
 
 
 def test_case_insensitive_substring():
-    assert _find_replace("2Men and 2MALEs", "2men|2male", "x") == "x and xs"
+    assert _find_replace("2Men and 2MALEs", "2men|2male", "x", whole_word=False) == "x and xs"
+
+
+def test_whole_word_default_keeps_compound_tokens():
+    f = "brief|briefs|underwear|shorts|sweatshorts"
+    assert _find_replace("tnga_brief underwear", f, "X") == "tnga_brief X"
+    assert _find_replace("cotton sweatshorts here", "shorts", "X") == "cotton sweatshorts here"
+    assert _find_replace("briefly, boxer briefs.", f, "X") == "briefly, boxer X."
+
+
+def test_whole_word_matches_symbol_alternatives():
+    assert _find_replace("{char} walks", "{char}", "Ivan_Ryo") == "Ivan_Ryo walks"
+
+
+def test_whole_word_off_is_substring():
+    assert _find_replace("sweatshorts", "shorts", "X", whole_word=False) == "sweatX"
 
 
 def test_empty_find_returns_text_unchanged():
@@ -45,8 +60,10 @@ def test_node_run():
 
 def test_input_types_shape():
     types = FindAndReplace.INPUT_TYPES()
-    assert list(types["required"]) == ["text", "find", "replace"]
+    assert list(types["required"]) == ["text", "find", "replace", "whole_word"]
     assert types["required"]["text"][1]["forceInput"] is True
+    assert types["required"]["whole_word"][0] == "BOOLEAN"
+    assert types["required"]["whole_word"][1]["default"] is True
     assert list(types["optional"]) == ["replace_in"]
     assert types["optional"]["replace_in"][1]["forceInput"] is True
 

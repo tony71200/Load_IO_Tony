@@ -1,7 +1,7 @@
 import re
 
 
-def _find_replace(text, find, replace, replace_in=None):
+def _find_replace(text, find, replace, replace_in=None, whole_word=True):
     if replace_in is not None:
         if not replace:
             replace = replace_in
@@ -11,7 +11,11 @@ def _find_replace(text, find, replace, replace_in=None):
     if not alts:
         return text
     alts.sort(key=len, reverse=True)
-    pattern = re.compile("|".join(re.escape(a) for a in alts), re.IGNORECASE)
+    body = "|".join(re.escape(a) for a in alts)
+    if whole_word:
+        # "_" counts as a word char, so "tnga_brief" never matches "brief".
+        body = rf"(?<!\w)(?:{body})(?!\w)"
+    pattern = re.compile(body, re.IGNORECASE)
     return pattern.sub(lambda m: replace, text)
 
 
@@ -23,6 +27,7 @@ class FindAndReplace:
                 "text": ("STRING", {"forceInput": True}),
                 "find": ("STRING", {"default": "", "multiline": False}),
                 "replace": ("STRING", {"default": "", "multiline": False}),
+                "whole_word": ("BOOLEAN", {"default": True, "tooltip": "Match whole words only (brief does not hit tnga_brief or briefly)."}),
             },
             "optional": {
                 "replace_in": ("STRING", {"forceInput": True}),
@@ -34,5 +39,5 @@ class FindAndReplace:
     FUNCTION = "run"
     CATEGORY = "Tony4896/Text"
 
-    def run(self, text, find, replace, replace_in=None):
-        return (_find_replace(text, find, replace, replace_in),)
+    def run(self, text, find, replace, whole_word=True, replace_in=None):
+        return (_find_replace(text, find, replace, replace_in, whole_word),)
